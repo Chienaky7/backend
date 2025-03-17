@@ -14,18 +14,20 @@ import org.springframework.stereotype.Service;
 
 import com.example.myweb.dto.request.AuthenticationRequest;
 import com.example.myweb.dto.request.IntrospectRequest;
-import com.example.myweb.dto.request.LogoutRequest;
 import com.example.myweb.dto.respone.AuthenticationRespone;
 import com.example.myweb.entity.InvalidatedToken;
+import com.example.myweb.entity.Role;
 import com.example.myweb.entity.User;
 import com.example.myweb.exception.AppException;
 import com.example.myweb.exception.ErrorCode;
+import com.example.myweb.mapper.UserMapper;
 import com.example.myweb.repository.InvalidatedTokenRepository;
 import com.example.myweb.repository.UserRepository;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.JWSObject;
+import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.Payload;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
@@ -46,6 +48,8 @@ public class AuthenticationService {
 
     InvalidatedTokenRepository invalidatedTokenRepository;
 
+    UserMapper userMapper;
+
     @NonFinal
     @Value("${signer.key}")
     String key;
@@ -57,9 +61,14 @@ public class AuthenticationService {
     @Value("${refreshable.duration}")
     long refreshableDuration;
 
-    public AuthenticationRespone refreshToken(IntrospectRequest request) throws JOSEException, ParseException {
+    public Boolean introspect(String token) throws ParseException {
+        SignedJWT signedJWT = SignedJWT.parse(token);
+        return !invalidatedTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID());
+    }
 
-        var signToken = veriFier(request.getToken(), true);
+    public AuthenticationRespone refreshToken(IntrospectRequest request) throws ParseException, JOSEException {
+
+        var signToken = veriFier(request.getToken());
 
         String jit = signToken.getJWTClaimsSet().getJWTID();
 
@@ -70,46 +79,34 @@ public class AuthenticationService {
                 .expiryTime(expiryTime)
                 .build();
         invalidatedTokenRepository.save(invalidatedToken);
+        var username = signToken.getJWTClaimsSet().getSubject();
 
-        var userNmae = signToken.getJWTClaimsSet().getSubject();
-
-        var user = userRepository.findByUsername(userNmae)
+        var user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
 
-        return AuthenticationRespone.builder()
-                .token(generateToken(user))
-                .isAuthBoolean(true)
-                .build();
+        return AuthenticationRespone.builder().token(generateToken(user)).build();
     }
 
-    public Boolean introspect(IntrospectRequest request) throws JOSEException, ParseException {
-        try {
-            veriFier(request.getToken(), false);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    public SignedJWT veriFier(String token, Boolean isRefresh) throws JOSEException, ParseException {
+    public SignedJWT veriFier(String token) throws JOSEException, ParseException {
         try {
             SignedJWT signedJWT = SignedJWT.parse(token);
 
-            Date expiration = isRefresh.booleanValue()
-                    ? new Date(signedJWT.getJWTClaimsSet().getIssueTime().toInstant()
-                            .plus(refreshableDuration, ChronoUnit.SECONDS).toEpochMilli())
-                    : signedJWT.getJWTClaimsSet().getExpirationTime();
+            Date expiration = Date.from(signedJWT.getJWTClaimsSet().getIssueTime().toInstant()
+                    .plus(refreshableDuration, ChronoUnit.SECONDS));
 
-            if (!(expiration.after(new Date()))
-                    && signedJWT.verify(new MACVerifier(key.getBytes()))) {
+            if (expiration.before(new Date())) {
                 throw new AppException(ErrorCode.UNAUTHENTICATED);
             }
 
-            if (invalidatedTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID())) {
+            // Xác minh chữ ký
+            JWSVerifier verifier = new MACVerifier(key.getBytes());
+            if (!signedJWT.verify(verifier)) {
                 throw new AppException(ErrorCode.UNAUTHENTICATED);
             }
 
             return signedJWT;
+        } catch (JOSEException | ParseException e) {
+            throw new AppException(ErrorCode.TOKEN_INVALID);
         } catch (Exception e) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
@@ -126,17 +123,13 @@ public class AuthenticationService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
-
-        return AuthenticationRespone.builder()
-                .token(generateToken(user))
-                .isAuthBoolean(true)
-                .build();
+        return AuthenticationRespone.builder().user(userMapper.toUserRespone(user)).token(generateToken(user)).build();
 
     }
 
-    public void logout(LogoutRequest request) throws JOSEException, ParseException {
+    public void logout(String token) throws JOSEException, ParseException {
 
-        var signToken = veriFier(request.getToken(), true);
+        var signToken = veriFier(token);
 
         String jit = signToken.getJWTClaimsSet().getJWTID();
 
@@ -149,7 +142,7 @@ public class AuthenticationService {
         invalidatedTokenRepository.save(invalidatedToken);
     }
 
-    private String generateToken(User user) {
+    public String generateToken(User user) {
         try {
             JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
 
@@ -175,14 +168,16 @@ public class AuthenticationService {
     }
 
     private String buildScope(User user) {
-
+        if (user == null || user.getRole() == null) {
+            return "";
+        }
         StringJoiner stringJoiner = new StringJoiner(" ");
-        if (!CollectionUtils.isEmpty(user.getRoles())) {
-            user.getRoles().forEach(role -> {
-                stringJoiner.add("ROLE" + role.getName());
-                if (!CollectionUtils.isEmpty(role.getPermissions()))
-                    role.getPermissions().forEach(permission -> stringJoiner.add(permission.getName()));
-            });
+        Role role = user.getRole();
+
+        stringJoiner.add("ROLE_" + role.getName());
+
+        if (!CollectionUtils.isEmpty(role.getPermissions())) {
+            role.getPermissions().forEach(permission -> stringJoiner.add(permission.getName()));
         }
         return stringJoiner.toString();
     }

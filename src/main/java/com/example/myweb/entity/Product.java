@@ -1,18 +1,21 @@
 package com.example.myweb.entity;
 
-import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.util.Set;
 
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -25,33 +28,56 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class Product {
+@EqualsAndHashCode(callSuper = true)
+public class Product extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long id;
-
-    @Column(name = "name", nullable = false, length = 255)
     String name;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     String description;
 
-    @Column(name = "price", nullable = false, precision = 10, scale = 2)
-    Double price;
+    BigDecimal price;
+    BigDecimal salePrice;
+    int stock;
 
-    @Column(name = "stock", nullable = false)
-    @Builder.Default
-    Integer stock = 0;
+    String sku;
+    String barcode;
+    BigDecimal weight;
 
-    @Column(name = "image_url", length = 255)
-    String imageUrl;
+    double length;
+    double width;
+    double height;
 
-    @Column(name = "created_at", updatable = false)
-    @CreationTimestamp
-    LocalDateTime createdAt;
+    String title;
+    String descriptionSeo;
+    String keywords;
 
-    @Column(name = "updated_at")
-    @UpdateTimestamp
-    LocalDateTime updatedAt;
+    String status;
+    Boolean featured;
+    Boolean taxable;
+    String publishDate;
+
+    @OneToMany(mappedBy = "product", orphanRemoval = true, cascade = CascadeType.ALL)
+    @JsonManagedReference
+    Set<Image> images;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    Set<ProductVariant> variants;
+
+    @ManyToOne
+    @JsonBackReference
+    @JoinColumn(name = "category_id")
+    Category category;
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    Set<OrderDetail> orderDetails;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    Set<Review> reviews;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    Set<Inventory> inventories;
 }

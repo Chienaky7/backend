@@ -1,7 +1,5 @@
 package com.example.myweb.dto.request;
 
-import java.time.LocalDate;
-
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -16,12 +14,9 @@ import lombok.experimental.FieldDefaults;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserCreatRequest {
+
     String username;
-
     @Size(min = 8, message = "USERNAME_INVALID")
-
     String password;
-    String firstName;
-    String lastName;
-    LocalDate dob;
+    String fullName;
 }

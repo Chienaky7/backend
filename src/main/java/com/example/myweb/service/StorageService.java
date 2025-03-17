@@ -19,39 +19,42 @@ import com.example.myweb.exception.AppException;
 import com.example.myweb.exception.ErrorCode;
 import com.example.myweb.repository.ImpStorageService;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+
 @Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class StorageService implements ImpStorageService {
 
-    private final Path rootLocation = Paths.get("D:\\quanligame\\myweb\\src\\main\\resources\\static");
+    private final Path pathImage = Paths.get("src/main/resources/static/uploads/image");
 
     @Override
-    public void store(MultipartFile file) {
+    public String store(MultipartFile file, Path path) {
+
         try {
-            if (file.isEmpty()) {
-                throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
-            }
-            Path destinationFile = this.rootLocation.resolve(
-                    Paths.get(file.getOriginalFilename()))
-                    .normalize().toAbsolutePath();
-            if (!destinationFile.getParent().equals(this.rootLocation.toAbsolutePath())) {
-                // This is a security check
-                throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+
+            if (!path.getParent().equals(this.pathImage.toAbsolutePath())) {
+
+                throw new AppException(ErrorCode.CANNOT_DIRECTORY);
             }
             try (InputStream inputStream = file.getInputStream()) {
-                Files.copy(inputStream, destinationFile,
+                Files.copy(inputStream, path,
                         StandardCopyOption.REPLACE_EXISTING);
             }
+            return path.getFileName().toString();
         } catch (IOException e) {
-            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+            throw new AppException(ErrorCode.FAILED_STORE);
         }
     }
 
     @Override
     public Stream<Path> loadAll() {
         try {
-            return Files.walk(this.rootLocation, 1)
-                    .filter(path -> !path.equals(this.rootLocation))
-                    .map(this.rootLocation::relativize);
+            return Files.walk(this.pathImage, 1)
+                    .filter(path -> !path.equals(this.pathImage))
+                    .map(this.pathImage::relativize);
         } catch (IOException e) {
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         }
@@ -60,7 +63,7 @@ public class StorageService implements ImpStorageService {
 
     @Override
     public Path load(String filename) {
-        return rootLocation.resolve(filename);
+        return pathImage.resolve(filename);
     }
 
     @Override
@@ -81,13 +84,26 @@ public class StorageService implements ImpStorageService {
 
     @Override
     public void deleteAll() {
-        FileSystemUtils.deleteRecursively(rootLocation.toFile());
+        FileSystemUtils.deleteRecursively(pathImage.toFile());
+    }
+
+    @Override
+    public void deleteProductImages(String nameImage) {
+        Path productImagePath = Paths.get(pathImage.toString(), nameImage);
+
+        try {
+            if (Files.exists(productImagePath)) {
+                FileSystemUtils.deleteRecursively(productImagePath);
+            }
+        } catch (IOException e) {
+            throw new AppException(ErrorCode.IMAGE_NULL);
+        }
     }
 
     @Override
     public void init() {
         try {
-            Files.createDirectories(rootLocation);
+            Files.createDirectories(pathImage);
         } catch (IOException e) {
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         }

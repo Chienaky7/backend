@@ -3,6 +3,8 @@ package com.example.myweb.entity;
 import java.util.Date;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -21,7 +23,8 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class InvalidatedToken {
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    String id;
     String token;
     Date expiryTime;
-
 }

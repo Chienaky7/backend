@@ -9,7 +9,7 @@ import java.util.stream.Stream;
 public interface ImpStorageService {
     void init();
 
-    void store(MultipartFile file);
+    String store(MultipartFile file, Path path);
 
     Stream<Path> loadAll();
 
@@ -18,4 +18,6 @@ public interface ImpStorageService {
     Resource loadAsResource(String filename);
 
     void deleteAll();
+
+    void deleteProductImages(String nameImage);
 }

@@ -1,6 +1,6 @@
-package com.example.myweb.dto.request;
+package com.example.myweb.dto.respone;
 
-import java.util.Date;
+import java.util.List;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -14,7 +14,11 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class LogoutRequest {
-    String token;
-    Date expiryTime;
+public class PageResponse<T> {
+    List<T> content;
+    int page;
+    int size;
+    long totalElements;
+    int totalPages;
+    boolean last;
 }

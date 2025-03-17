@@ -1,8 +1,5 @@
 package com.example.myweb.dto.respone;
 
-import java.time.LocalDate;
-import java.util.Set;
-
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,10 +15,10 @@ import lombok.experimental.FieldDefaults;
 public class UserRespone {
     String id;
     String username;
-    String firstName;
-    String lastName;
-    LocalDate dob;
-    String image;
-    Set<RoleRespone> roles;
-
+    String fullName;
+    String email;
+    ImageRepone avatar;
+    String phoneNumber;
+    String address;
+    RoleRespone role;
 }
